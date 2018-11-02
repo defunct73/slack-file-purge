@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  A Lambda function that removes files older than a certain date from Slack
+Metadata:
+  Name: slack-file-purge
+  Version: 0.1.0
+Resources:
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}
+      RetentionInDays: 7
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Purge files older than a specified date from Slack
+      FunctionName: !Ref AWS::StackName
+      CodeUri: ./bin
+      Handler: filepurge
+      Runtime: go1.x
+      Timeout: 120
+      Policies:
+        -
+          Version: 2012-10-17
+          Statement:
+            -
+              Effect: Allow
+              Action: ssm:GetParameter
+              Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/insurrection-slack-team/oauth-token
+      Events:
+        JobSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 13 * * ? *) # Once a day at 6AM Pacific time.
+            Input: >-
+              {
+                "excluded_channels": [
+                  "C2JNMP4TE"
+                ]
+              }
