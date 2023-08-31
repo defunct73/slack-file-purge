@@ -1,4 +1,4 @@
-// +build !test
+//go:build !test
 
 package main
 
@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/nlopes/slack"
 )
 

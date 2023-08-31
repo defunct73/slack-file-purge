@@ -4,7 +4,7 @@ Description: >-
   A Lambda function that removes files older than a certain date from Slack
 Metadata:
   Name: slack-file-purge
-  Version: 0.1.0
+  Version: 0.2.0
 Resources:
   LogGroup:
     Type: AWS::Logs::LogGroup
@@ -17,15 +17,15 @@ Resources:
       Description: Purge files older than a specified date from Slack
       FunctionName: !Ref AWS::StackName
       CodeUri: ./bin
-      Handler: filepurge
-      Runtime: go1.x
+      Architectures:
+        - arm64
+      Runtime: provided.al2
+      Handler: bootstrap
       Timeout: 120
       Policies:
-        -
-          Version: 2012-10-17
+        - Version: 2012-10-17
           Statement:
-            -
-              Effect: Allow
+            - Effect: Allow
               Action: ssm:GetParameter
               Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/insurrection-slack-team/oauth-token
       Events:

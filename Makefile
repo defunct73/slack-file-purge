@@ -1,14 +1,3 @@
-# Go minimum version check.
-GO_MIN_VERSION := 11000 # 1.10
-GO_VERSION_CHECK := \
-  $(shell expr \
-    $(shell go version | \
-      awk '{print $$3}' | \
-      cut -do -f2 | \
-      sed -e 's/\.\([0-9][0-9]\)/\1/g' -e 's/\.\([0-9]\)/0\1/g' -e 's/^[0-9]\{3,4\}$$/&00/' \
-    ) \>= $(GO_MIN_VERSION) \
-  )
-
 # Default Go linker flags.
 GO_LDFLAGS ?= -ldflags="-s -w"
 
@@ -24,11 +13,10 @@ STACK_NAME       ?= slack-file-purge
 ARTIFACTS_BUCKET ?= $(STACK_NAME)-$(ACCOUNT_ID)-$(AWS_REGION)
 
 .PHONY: all
-all: check-go clean $(FILE_PURGE)
+all: clean $(FILE_PURGE)
 
 $(FILE_PURGE):
-	GOOS=linux GOARCH=amd64 go build $(GO_LDFLAGS) $(BUILDARGS) -o $@ ./...
-	zip -j $@.zip $@
+	GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -tags lambda.norpc $(GO_LDFLAGS) $(BUILDARGS) -o ./bin/bootstrap ./...
 
 chkenv-%:
 	@if [ "${${*}}" = "" ]; then \
@@ -50,7 +38,7 @@ update-oauth-token: chkenv-SLACK_OAUTH_TOKEN
 	  --overwrite
 
 .PHONY: package
-package: check-go clean all
+package: clean all
 	aws cloudformation package \
 	  --template-file template.yaml \
 	  --output-template-file $(SAM_TEMPLATE) \
@@ -65,27 +53,29 @@ deploy:
 
 .PHONY: vendor
 vendor:
-	dep ensure
+	go mod tidy
+	go mod vendor
 
 .PHONY: test
-test: check-go
-	go test $(TESTARGS) -timeout=30s ./...
+test:
+	go test -buildvcs=false -race -timeout=30s $(TESTARGS) ./...
 	@$(MAKE) vet
 	@$(MAKE) lint
 
 .PHONY: vet
-vet: check-go
-	go vet $(VETARGS) ./...
+vet:
+	go vet -buildvcs=false $(VETARGS) ./...
 
 .PHONY: lint
-lint: check-go
-	@echo "golint $(LINTARGS)"
-	@for pkg in $(shell go list ./...) ; do \
-		golint $(LINTARGS) $$pkg ; \
-	done
+lint:
+	staticcheck -tags -buildvcs=false $(LINTARGS) ./...
+
+.PHONY: install-staticcheck
+install-staticcheck:
+	go install honnef.co/go/tools/cmd/staticcheck@latest
 
 .PHONY: cover
-cover: check-go
+cover:
 	@$(MAKE) test TESTARGS="-tags test -race -coverprofile=coverage.out"
 	@go tool cover -html=coverage.out
 	@rm -f coverage.out
@@ -93,9 +83,3 @@ cover: check-go
 .PHONY: clean
 clean:
 	@rm -rf ./bin sam_template.yaml
-
-.PHONY: check-go
-check-go:
-ifeq ($(GO_VERSION_CHECK),0)
-	$(error go1.10 or higher is required)
-endif
